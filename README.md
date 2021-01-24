@@ -9,7 +9,7 @@ This ACT plugin provides some additional functional to the FFXIV ACT plugin.
 1. Download the ACT Plugin. Extract the ZIP. Open ACT and navigate to the plugins tab.
 2. Click Browser and locate the 'FFXIV_ACT_Tools.cs' file.
 3. Click 'Add/Enable Plugin.'
-4. Click on the 'FFXIV_ACT_Tools.cs' tab. Click all the checkboxes the functionality you wish to use.
+4. Click on the 'FFXIV ACT Tools' tab. Click all the checkboxes the functionality you wish to use.
 5. (Optional) If enabling any of the auto end encounter features you should increase the number of seconds to wait after the last combat action to begin a new encounter" in ACT to a high value such as 120 (2 minutes).
 
 
@@ -31,3 +31,6 @@ I do want to make additional cool features. Some ideas include...
 - End encounter on clear.
 
 Got any ideas of your own? Message me on Discord! **Chompy#3436**
+
+## TODO
+- Make web page timer tick in real time and sync with ACT occasionally.

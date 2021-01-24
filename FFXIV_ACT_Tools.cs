@@ -35,7 +35,7 @@ using Advanced_Combat_Tracker;
 
 namespace ACT_Plugin
 {
-    public class FFLiveParse : UserControl, IActPluginV1
+    public class FFXIV_ACT_Tools : UserControl, IActPluginV1
     {
 
         const Int32 VERSION_NUMBER = 1;                         // Version number, much match version number in parse server
@@ -52,15 +52,14 @@ namespace ACT_Plugin
         private string[][] optionList;                          // List of options to be configured.
         private List<System.Windows.Forms.CheckBox> checkboxes; // List of settings checkboxes.
         private System.Windows.Forms.Button openWebBtn;         // Button that opens web page when clicked.
-        private Dictionary<int, string> nameIdTable;            // Link character id with character names.
         private Dictionary<int, bool> deathTracker;             // Tracks deaths to determine when party wipe occurs.
+        private Dictionary<int, string[]> nameLookupTable;     // Mapping of actor id to act name and log name.
         private string settingFilePath = Path.Combine(          // Path to settings file.
             ActGlobals.oFormActMain.AppDataFolder.FullName,
             "Config\\FFXIV_ACT_Tools.config.dat"
         );
-        const string WEB_PAGE_DATA = "PCFET0NUWVBFIGh0bWw+PGh0bWw+PGhlYWQ+PHRpdGxlPkxpdmUgUGFyc2U8L3RpdGxlPjxsaW5rIHJlbD0ic3R5bGVzaGVldCIgdHlwZT0idGV4dC9jc3MiIGhyZWY9Imh0dHBzOi8vZ2l0Y2RuLmxpbmsvcmVwby9jaG9tcHkvZmZ4aXZfYWN0X3Rvb2xzL21haW4vd2ViL2FwcC5jc3MiIC8+PC9oZWFkPjxib2R5PjxkaXYgaWQ9ImFwcCI+PC9kaXY+IDxzY3JpcHQgdHlwZT0idGV4dC9qYXZhc2NyaXB0IiBzcmM9Imh0dHBzOi8vZ2l0Y2RuLmxpbmsvcmVwby9jaG9tcHkvZmZ4aXZfYWN0X3Rvb2xzL21haW4vd2ViL2FwcC5qcyI+PC9zY3JpcHQ+IDwvYm9keT48L2h0bWw+";
 
-        public FFLiveParse()
+        public FFXIV_ACT_Tools()
         {
             // create option list
             this.optionList = new string[][]{
@@ -109,13 +108,13 @@ namespace ACT_Plugin
             // finish building form
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.Name = "FFLiveParse";
+			this.Name = "FFXIV ACT Tools";
 			this.Size = new System.Drawing.Size(686, 384);
 			this.ResumeLayout(false);
 			this.PerformLayout();
             // init death tracker
-            this.nameIdTable = new Dictionary<int, string>();
             this.deathTracker = new Dictionary<int, bool>();
+            this.nameLookupTable = new Dictionary<int, string[]>();
             // init regexs
             this.regexLogDefeat = new Regex(
                 @" 19:([a-zA-Z0-9'\- ]*) was defeated by [A-Za-z'\- ]*",
@@ -141,6 +140,12 @@ namespace ACT_Plugin
             // form stuff
 			pluginScreenSpace.Controls.Add(this);	// Add this UserControl to the tab ACT provides
 			this.Dock = DockStyle.Fill;	// Expand the UserControl to fill the tab's client space
+            // set tab title
+            foreach (ActPluginData p in ActGlobals.oFormActMain.ActPlugins) {
+                if (p.pluginObj == this) {
+                    p.tpPluginSpace.Text = "FFXIV ACT Tools";
+                }
+            }
             // start web server
             this.initWebServer();
         }
@@ -166,7 +171,11 @@ namespace ACT_Plugin
 
         void oFormActMain_AfterCombatAction(bool isImport, CombatActionEventArgs actionInfo)
         {
-            if (actionInfo.cancelAction) {
+            if (
+                actionInfo.cancelAction ||
+                !actionInfo.tags.ContainsKey("Job") ||
+                (string) actionInfo.tags["Job"] == ""
+            ) {
                 return;
             }
             // add to death tracker if not already added
@@ -175,12 +184,15 @@ namespace ACT_Plugin
                     (string) actionInfo.tags["ActorID"],
                     System.Globalization.NumberStyles.HexNumber
                 );
-                if (
-                    !this.deathTracker.ContainsKey(cId) &&
-                    actionInfo.tags.ContainsKey("Job") &&
-                    (string) actionInfo.tags["Job"] != ""
-                ) {
+                // add entry to death tracker
+                if (!this.deathTracker.ContainsKey(cId)) {
                     this.deathTracker[cId] = false;
+                }
+                // add entry to name lookup table
+                if (!this.nameLookupTable.ContainsKey(cId)) {
+                    this.nameLookupTable[cId] = new string[]{
+                        actionInfo.attacker, ""
+                    };
                 }
             }
         }
@@ -210,7 +222,9 @@ namespace ACT_Plugin
                         System.Globalization.NumberStyles.HexNumber
                     );
                     var name = fields[2];
-                    this.nameIdTable[id] = name;
+                    if (this.nameLookupTable.ContainsKey(id)) {
+                        this.nameLookupTable[id][1] = name;
+                    }
                     break;
                 }
                 case LOG_TYPE_MESSAGE: {
@@ -220,7 +234,7 @@ namespace ACT_Plugin
                     );
                     switch (msgType) {
                         case LOG_MESSAGE_COUNTDOWN: {
-                            this.lblStatus.Text = "COUNTDOWN RESET";
+                            //this.lblStatus.Text = "COUNTDOWN RESET";
                             if (this.getSetting("end_on_countdown")) {
                                 this.reset();
                             }
@@ -231,7 +245,7 @@ namespace ACT_Plugin
                 }
             }
             if (this.isWipe() && this.getSetting("end_on_wipe")) {
-                this.lblStatus.Text = "WIPE RESET";
+                //this.lblStatus.Text = "WIPE RESET";
                 this.reset();
             }
         }
@@ -254,7 +268,16 @@ namespace ACT_Plugin
         void reset() { 
             ActGlobals.oFormActMain.EndCombat(true);
             this.deathTracker.Clear();
-            this.nameIdTable.Clear();
+            this.nameLookupTable.Clear();
+        }
+
+        string getPluginDirectory() {
+            foreach (ActPluginData p in ActGlobals.oFormActMain.ActPlugins) {
+                if (p.pluginObj == this) {
+                    return p.pluginFile.DirectoryName;
+                }
+            }
+            return "";
         }
 
         //
@@ -262,15 +285,15 @@ namespace ACT_Plugin
         //
 
         string getCombatantNameFromId(int id) {
-            if (this.nameIdTable.ContainsKey(id)) {
-                return this.nameIdTable[id];
+            if (this.nameLookupTable.ContainsKey(id)) {
+                return this.nameLookupTable[id][1];
             }
             return "";
         }
 
         int getCombatantIdFromName(string name) {
-            foreach (int id in this.nameIdTable.Keys) {
-                if (this.nameIdTable[id] == name) {
+            foreach (int id in this.nameLookupTable.Keys) {
+                if (this.nameLookupTable[id][1] == name) {
                     return id;
                 }
             }
@@ -278,8 +301,8 @@ namespace ACT_Plugin
         }
 
         void setDeathByName(string name, bool active) {
-            foreach (int id in this.nameIdTable.Keys) {
-                if (name == this.nameIdTable[id]) {
+            foreach (int id in this.nameLookupTable.Keys) {
+                if (name == this.nameLookupTable[id][1]) {
                     this.deathTracker[id] = true;
                 }
             }
@@ -314,7 +337,16 @@ namespace ACT_Plugin
             res += encounter.GetEncounterSuccessLevel().ToString();
             res += "\r\n";
             foreach (CombatantData cd in encounter.GetAllies()) {
-                res += cd.Name + "|";
+                bool hasName = false;
+                foreach (var v in this.nameLookupTable.Values) {
+                    if (v[0] == cd.Name && v[1] != "") {
+                        hasName = true;
+                        res += v[1] + "|";
+                    }
+                }
+                if (!hasName) {
+                    continue;
+                }
                 res += cd.GetColumnByName("Job") + "|";
                 res += cd.Damage.ToString() + "|";
                 res += cd.DamageTaken.ToString() + "|";
@@ -396,18 +428,22 @@ namespace ACT_Plugin
         //
 
         void initWebServer() {
+            this.openWebBtn.Enabled = false;
             if (!this.getSetting("web_server")) {
-                this.openWebBtn.Enabled = false;
                 return;
             }
-            this.webListener = new TcpListener(
-                IPAddress.Parse("0.0.0.0"),
-                HTTP_SERVER_PORT
-            );
-            this.webListener.Start();
-            this.webThread = new Thread(new ThreadStart(this.webListen));
-            this.webThread.Start();
-            this.openWebBtn.Enabled = true;
+            try {
+                this.webListener = new TcpListener(
+                    IPAddress.Parse("0.0.0.0"),
+                    HTTP_SERVER_PORT
+                );
+                this.webListener.Start();
+                this.webThread = new Thread(new ThreadStart(this.webListen));
+                this.webThread.Start();
+                this.openWebBtn.Enabled = true;
+            } catch {
+                this.lblStatus.Text = "Failed to start web server.";
+            }
         }
 
         void deinitWebServer() {
@@ -417,48 +453,96 @@ namespace ACT_Plugin
         }
 
         void webListen() {
+
+            var webPath = this.getPluginDirectory() + "\\web";
             while (true) {
-                Socket s = this.webListener.AcceptSocket();  
-                if (!s.Connected) {
-                    continue;
-                }
-                // read request
-                var recvBytes = new Byte[2048];
-                s.Receive(recvBytes, recvBytes.Length, 0);
-                var recv = Encoding.ASCII.GetString(recvBytes);
-                var path = recv.Split(' ')[1];
-                // send response
-                switch (path) {
-                    // combat data
-                    case "/_fetch": {
-                        var sendData = "HTTP/1.1\r\n";
-                        sendData += "Content-Type: text/plain\r\n";
-                        sendData += "\r\n";
-                        sendData += this.exportCombatData();
-                        var sendBytes = Encoding.ASCII.GetBytes(sendData);
-                        s.Send(
-                            sendBytes,
-                            sendBytes.Length,
-                            0
-                        );
+                try {
+                    Socket s = this.webListener.AcceptSocket();  
+                    if (!s.Connected) {
+                        continue;
+                    }
+                    // read request
+                    var recvBytes = new Byte[8192];
+                    s.Receive(recvBytes, recvBytes.Length, 0);
+                    var recv = Encoding.ASCII.GetString(recvBytes);
+                    if (recv.Trim() == "") {
                         break;
                     }
-                    // main app html
-                    default: {
-                        var sendData = "HTTP/1.1\r\n";
-                        sendData += "Content-Type: text/html;charset=UTF-8\r\n";
-                        sendData += "\r\n";
-                        sendData += Encoding.UTF8.GetString(Convert.FromBase64String(WEB_PAGE_DATA));
-                        var sendBytes = Encoding.ASCII.GetBytes(sendData);
-                        s.Send(
-                            sendBytes,
-                            sendBytes.Length,
-                            0
-                        );
+                    var recvSplit = recv.Split(' ');
+                    if (recvSplit.Length < 1) {
                         break;
                     }
+                    var path = recvSplit[1];
+                    // send response
+                    switch (path) {
+                        // combat data
+                        case "/_fetch": {
+                            var sendData = "HTTP/1.1 200 OK\r\n";
+                            sendData += "Content-Type: text/plain\r\n";
+                            sendData += "\r\n";
+                            sendData += this.exportCombatData();
+                            var sendBytes = Encoding.ASCII.GetBytes(sendData);
+                            s.Send(
+                                sendBytes,
+                                sendBytes.Length,
+                                0
+                            );
+                            break;
+                        }
+                        // main app html
+                        default: {
+                            // determine which file to serve
+                            var serveFile = webPath + path.Replace("/", "\\");
+                            if (!File.Exists(serveFile)) {
+                                serveFile = webPath + "\\app.html";
+                            }
+                            // determine mime type
+                            var mimeType = "text/plain";
+                            switch (Path.GetExtension(serveFile)) {
+                                case ".html": {
+                                    mimeType = "text/html;charset=UTF-8";
+                                    break;
+                                }
+                                case ".css": {
+                                    mimeType = "text/css";
+                                    break;
+                                }
+                                case ".js": {
+                                    mimeType = "text/javascript";
+                                    break;
+                                }
+                                case ".png": {
+                                    mimeType = "image/png";
+                                    break;
+                                }
+                            }
+                            // read file                            
+                            using (FileStream fs = new FileStream(serveFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+                            {
+                                using (MemoryStream ms = new MemoryStream())
+                                {
+                                    fs.CopyTo(ms);
+                                    var headerString = "HTTP/1.1 200 OK\r\n";
+                                    headerString += "Content-Type: " + mimeType + "\r\n";
+                                    headerString += "\r\n";
+                                    var headerBytes = Encoding.ASCII.GetBytes(headerString);
+                                    var bodyBytes = ms.ToArray();
+                                    var sendBytes = new Byte[headerBytes.Length + bodyBytes.Length];
+                                    System.Buffer.BlockCopy(headerBytes, 0, sendBytes, 0, headerBytes.Length);
+                                    System.Buffer.BlockCopy(bodyBytes, 0, sendBytes, headerBytes.Length, bodyBytes.Length);
+                                    s.Send(
+                                        sendBytes,
+                                        sendBytes.Length,
+                                        0
+                                    );
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    s.Close();
+                } catch {
                 }
-                s.Close();
             }
         }
 

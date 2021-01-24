@@ -90,7 +90,7 @@ html, body {
 .player .value {
     display: inline-block;
     margin-left: 35px;
-    background: url(img/icon_dps.png) no-repeat left 1px;
+    background: url(/img/icon_dps.png) no-repeat left 1px;
     background-size: 16px;
     min-width: 32px;
     min-height: 16px;
@@ -128,19 +128,19 @@ html, body {
     top: -8px;
 }
 .player .healing {
-    background-image: url(img/icon_hps.png);
+    background-image: url(/img/icon_hps.png);
 }
 .player .damage-taken {
-    background-image: url(img/icon_damage_taken.png);
+    background-image: url(/img/icon_damage_taken.png);
 }
 .player .deaths {
-    background-image: url(img/icon_deaths.png);
+    background-image: url(/img/icon_deaths.png);
 }
 .player .critical-hits {
-    background-image: url(img/icon_critical_hits.png);
+    background-image: url(/img/icon_critical_hits.png);
 }
 .player .critical-heals {
-    background-image: url(img/icon_critical_heals.png);
+    background-image: url(/img/icon_critical_heals.png);
 }
 
 
@@ -180,6 +180,7 @@ html, body {
 /** 200px **/
 @media (max-width: 200px) {
     .player .job {
-        width: 33%;
+        width: 44px;
+        margin-right: 1%;
     }
 }

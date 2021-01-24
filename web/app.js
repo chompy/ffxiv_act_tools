@@ -1,4 +1,4 @@
-const IMG_URL_PREFIX = "https://raw.githubusercontent.com/chompy/ffxiv_act_tools/main/web/img/";
+const IMG_URL_PREFIX = "/img/";
 const FETCH_URL = "/_fetch";
 const ENC_START = 0;
 const ENC_END = 1;
@@ -97,8 +97,11 @@ function updateEncounter(data) {
 }
 
 function updateCombatants(data) {
-    for (var i in data.combatants) {
-        updateCombatant(data.combatants[i]);
+    data.combatants.sort(function(a, b) {
+        return parseInt(a[COMB_DAMAGE]) < parseInt(b[COMB_DAMAGE]) ? 1 : -1;
+    });
+    for (var i = 0; i < data.combatants.length; i++) {
+        updateCombatant(data.combatants[i], i+1);
     }
 }
 
@@ -119,9 +122,11 @@ function buildColumn(rows) {
     return element;
 }
 
-function updateCombatant(data) {
-
-    var nameId = data[COMB_NAME].toLowerCase().replaceAll(" ", "-").replaceAll("'", "");
+function updateCombatant(data, sort) {
+    if (!data || !data[COMB_NAME]) {
+        return;
+    }
+    var nameId = data[COMB_NAME].toLowerCase().replace(" ", "-").replace("'", "");
     var element = document.getElementById("player-" + nameId);
     // create new element if not exists
     if (!element) {
@@ -136,7 +141,7 @@ function updateCombatant(data) {
         element.appendChild(colOneEle);
         // --- job
         var jobEle = document.createElement("img")
-        jobEle.className = "job";
+        jobEle.className = "job-img";
         colOneEle.appendChild(jobEle);
         // -- column 2
         var colTwoEle = buildColumn([
@@ -154,8 +159,11 @@ function updateCombatant(data) {
         ]);
         element.appendChild(colFourEle);
     }
+    element.style.order = sort;
+    element.style.webkitOrder = sort;
+
     // update job
-    var jobEle = element.getElementsByClassName("name")[0];
+    var jobEle = element.getElementsByClassName("job-img")[0];
     jobEle.title = data[COMB_JOB].toLowerCase();
     if (!jobEle.title) {
         jobEle.title = "lb";
@@ -181,11 +189,17 @@ function updateCombatant(data) {
     // update crit hits
     var critEle = element.getElementsByClassName("critical-hits")[0];
     var critPerc = ((data[COMB_CRIT] / data[COMB_HITS]) * 100).toFixed(1);
+    if (data[COMB_CRIT] <= 0) {
+        critPerc = "0.0";
+    }
     critEle.innerText = critPerc + "%";
     critEle.title + critEle.innerText + " critical hits (" + data[COMB_CRIT] + " out of " + data[COMB_HITS] + ").";
     // update crit heals
     var critHeals = element.getElementsByClassName("critical-heals")[0];
     critPerc = ((data[COMB_CRIT_HEAL] / data[COMB_HEALS]) * 100).toFixed(1);
+    if (data[COMB_CRIT_HEAL] <= 0) {
+        critPerc = "0.0";
+    }
     critHeals.innerText = critPerc + "%";
     critHeals.title + critHeals.innerText + " critical heals (" + data[COMB_CRIT_HEAL] + " out of " + data[COMB_HEALS] + ").";
 }
