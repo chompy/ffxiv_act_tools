@@ -136,9 +136,7 @@ function updateCombatant(data) {
         element.appendChild(colOneEle);
         // --- job
         var jobEle = document.createElement("img")
-        jobEle.title = data[COMB_JOB].toLowerCase()
-        jobEle.alt = jobEle.title;
-        jobEle.src = IMG_URL_PREFIX + "jobs/" + jobEle.title + ".png";
+        jobEle.className = "job";
         colOneEle.appendChild(jobEle);
         // -- column 2
         var colTwoEle = buildColumn([
@@ -156,6 +154,14 @@ function updateCombatant(data) {
         ]);
         element.appendChild(colFourEle);
     }
+    // update job
+    var jobEle = element.getElementsByClassName("name")[0];
+    jobEle.title = data[COMB_JOB].toLowerCase();
+    if (!jobEle.title) {
+        jobEle.title = "lb";
+    }
+    jobEle.alt = jobEle.title;
+    jobEle.src = IMG_URL_PREFIX + "jobs/" + jobEle.title + ".png";
     // update name
     var nameEle = element.getElementsByClassName("name")[0];
     nameEle.innerText = data[COMB_NAME];
