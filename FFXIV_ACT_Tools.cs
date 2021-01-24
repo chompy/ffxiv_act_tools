@@ -58,7 +58,7 @@ namespace ACT_Plugin
             ActGlobals.oFormActMain.AppDataFolder.FullName,
             "Config\\FFXIV_ACT_Tools.config.dat"
         );
-        const string WEB_PAGE_DATA = "PCFET0NUWVBFIGh0bWw+PGh0bWw+PGhlYWQ+PHRpdGxlPkxpdmUgUGFyc2U8L3RpdGxlPjxsaW5rIHJlbD0ic3R5bGVzaGVldCIgdHlwZT0idGV4dC9jc3MiIGhyZWY9Imh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9jaG9tcHkvZmZ4aXZfYWN0X3Rvb2xzL21haW4vd2ViL2FwcC5jc3MiIC8+PC9oZWFkPjxib2R5PjxkaXYgaWQ9ImFwcCI+PC9kaXY+IDxzY3JpcHQgdHlwZT0idGV4dC9qYXZhc2NyaXB0IiBzcmM9Imh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9jaG9tcHkvZmZ4aXZfYWN0X3Rvb2xzL21haW4vd2ViL2FwcC5qcyI+PC9zY3JpcHQ+IDwvYm9keT48L2h0bWw+";
+        const string WEB_PAGE_DATA = "PCFET0NUWVBFIGh0bWw+PGh0bWw+PGhlYWQ+PHRpdGxlPkxpdmUgUGFyc2U8L3RpdGxlPjxsaW5rIHJlbD0ic3R5bGVzaGVldCIgdHlwZT0idGV4dC9jc3MiIGhyZWY9Imh0dHBzOi8vZ2l0Y2RuLmxpbmsvcmVwby9jaG9tcHkvZmZ4aXZfYWN0X3Rvb2xzL21haW4vd2ViL2FwcC5jc3MiIC8+PC9oZWFkPjxib2R5PjxkaXYgaWQ9ImFwcCI+PC9kaXY+IDxzY3JpcHQgdHlwZT0idGV4dC9qYXZhc2NyaXB0IiBzcmM9Imh0dHBzOi8vZ2l0Y2RuLmxpbmsvcmVwby9jaG9tcHkvZmZ4aXZfYWN0X3Rvb2xzL21haW4vd2ViL2FwcC5qcyI+PC9zY3JpcHQ+IDwvYm9keT48L2h0bWw+";
 
         public FFLiveParse()
         {
