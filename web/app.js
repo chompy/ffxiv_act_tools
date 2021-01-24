@@ -1,4 +1,4 @@
-const IMG_URL_PREFIX = "https://gitcdn.link/repo/chompy/ffxiv_act_tools/main/web/img/";
+const IMG_URL_PREFIX = "https://raw.githubusercontent.com/chompy/ffxiv_act_tools/main/web/img/";
 const FETCH_URL = "/_fetch";
 const ENC_START = 0;
 const ENC_END = 1;
