@@ -64,7 +64,7 @@ function poll() {
         clearTimeout(timeout);
     }
     fetch();
-    timeout = setTimeout(poll, 1000);
+    timeout = setTimeout(poll, 5000);
 }
 
 function reset() {
@@ -122,6 +122,13 @@ function buildColumn(rows) {
     return element;
 }
 
+function sanitizeNumeric(value) {
+    if (isNaN(value)) {
+        return 0;
+    }
+    return value;
+}
+
 function updateCombatant(data, sort) {
     if (!data || !data[COMB_NAME]) {
         return;
@@ -176,19 +183,19 @@ function updateCombatant(data, sort) {
     nameEle.title = nameEle.innerText;
     // update damage
     var damageEle = element.getElementsByClassName("damage")[0];
-    damageEle.innerText = (data[COMB_DAMAGE] / encounterSeconds).toFixed(2);
+    damageEle.innerText = sanitizeNumeric(data[COMB_DAMAGE] / encounterSeconds).toFixed(2);
     damageEle.title = damageEle.innerText + " damage per second (" + data[COMB_DAMAGE] + " total damage).";
     // update healing
     var healingEle = element.getElementsByClassName("healing")[0];
-    healingEle.innerText = (data[COMB_HEALED] / encounterSeconds).toFixed(2);
+    healingEle.innerText = sanitizeNumeric(data[COMB_HEALED] / encounterSeconds).toFixed(2);
     healingEle.title = healingEle.innerText + " healing per second (" + data[COMB_HEALED] + " total healing).";
     // update deaths
     var deathEle = element.getElementsByClassName("deaths")[0];
-    deathEle.innerText = data[COMB_DEATHS];
-    deathEle.title = data[COMB_DEATHS] + " deaths.";
+    deathEle.innerText = sanitizeNumeric(data[COMB_DEATHS]);
+    deathEle.title = sanitizeNumeric(data[COMB_DEATHS]) + " deaths.";
     // update crit hits
     var critEle = element.getElementsByClassName("critical-hits")[0];
-    var critPerc = ((data[COMB_CRIT] / data[COMB_HITS]) * 100).toFixed(1);
+    var critPerc = sanitizeNumeric((data[COMB_CRIT] / data[COMB_HITS]) * 100).toFixed(1);
     if (data[COMB_CRIT] <= 0) {
         critPerc = "0.0";
     }
@@ -196,7 +203,7 @@ function updateCombatant(data, sort) {
     critEle.title + critEle.innerText + " critical hits (" + data[COMB_CRIT] + " out of " + data[COMB_HITS] + ").";
     // update crit heals
     var critHeals = element.getElementsByClassName("critical-heals")[0];
-    critPerc = ((data[COMB_CRIT_HEAL] / data[COMB_HEALS]) * 100).toFixed(1);
+    critPerc = sanitizeNumeric((data[COMB_CRIT_HEAL] / data[COMB_HEALS]) * 100).toFixed(1);
     if (data[COMB_CRIT_HEAL] <= 0) {
         critPerc = "0.0";
     }
@@ -220,6 +227,9 @@ function parse(data) {
     if (data.length > 1) {
         for (let i = 1; i < data.length; i++) {
             if (!data[i]) { continue; }
+            if (data[i].indexOf("Shadow Of A Hero") != -1) {
+                continue;
+            }
             combatants.push(data[i].split("|"));
         }
     }

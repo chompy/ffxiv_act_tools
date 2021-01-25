@@ -34,3 +34,4 @@ Got any ideas of your own? Message me on Discord! **Chompy#3436**
 
 ## TODO
 - Make web page timer tick in real time and sync with ACT occasionally.
+- Figure out if it's possible to get updates in intervals of less than 10 seconds.

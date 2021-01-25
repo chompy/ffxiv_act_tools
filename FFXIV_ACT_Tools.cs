@@ -42,7 +42,9 @@ namespace ACT_Plugin
         const int LOG_TYPE_MESSAGE = 0x00;                      // Log identifier for chat message.
         const int LOG_TYPE_SINGLE = 0x15;                       // Log identifier for single target attack.
         const int LOG_TYPE_DEFEAT = 0x19;                       // Log identifier for defeated message.
-        const int LOG_MESSAGE_COUNTDOWN = 0x00b9;               // Log message identifier for countdown message.
+        const int LOG_MSG_COUNTDOWN_A = 0x0039;                 // Log message identifier for countdown message.
+        const int LOG_MSG_COUNTDOWN_B = 0x00b9;
+        const int LOG_MSG_COUNTDOWN_C = 0x0139;
         const UInt16 HTTP_SERVER_PORT = 31594;                  // Port to host webserver on.
 
         TcpListener webListener;                                // Listener for web requests.
@@ -104,7 +106,6 @@ namespace ACT_Plugin
             this.openWebBtn.Text = "Open Parse Web Page";
             this.openWebBtn.Enabled = true;
             this.Controls.Add(this.openWebBtn);
-
             // finish building form
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -147,7 +148,7 @@ namespace ACT_Plugin
                 }
             }
             // start web server
-            this.initWebServer();
+            this.initWebServer(HTTP_SERVER_PORT);
         }
 
         public void DeInitPlugin()
@@ -176,6 +177,10 @@ namespace ACT_Plugin
                 !actionInfo.tags.ContainsKey("Job") ||
                 (string) actionInfo.tags["Job"] == ""
             ) {
+                return;
+            }
+            var job = (string) actionInfo.tags["Job"];
+            if (job.Length > 3) {
                 return;
             }
             // add to death tracker if not already added
@@ -233,7 +238,9 @@ namespace ACT_Plugin
                         System.Globalization.NumberStyles.HexNumber
                     );
                     switch (msgType) {
-                        case LOG_MESSAGE_COUNTDOWN: {
+                        case LOG_MSG_COUNTDOWN_A:
+                        case LOG_MSG_COUNTDOWN_B:
+                        case LOG_MSG_COUNTDOWN_C: {
                             //this.lblStatus.Text = "COUNTDOWN RESET";
                             if (this.getSetting("end_on_countdown")) {
                                 this.reset();
@@ -337,6 +344,10 @@ namespace ACT_Plugin
             res += encounter.GetEncounterSuccessLevel().ToString();
             res += "\r\n";
             foreach (CombatantData cd in encounter.GetAllies()) {
+                var job = cd.GetColumnByName("Job");
+                if (job == "" || job.Length > 3) {
+                    continue;
+                }
                 bool hasName = false;
                 foreach (var v in this.nameLookupTable.Values) {
                     if (v[0] == cd.Name && v[1] != "") {
@@ -347,7 +358,7 @@ namespace ACT_Plugin
                 if (!hasName) {
                     continue;
                 }
-                res += cd.GetColumnByName("Job") + "|";
+                res += job + "|";
                 res += cd.Damage.ToString() + "|";
                 res += cd.DamageTaken.ToString() + "|";
                 res += cd.Healed.ToString() + "|";
@@ -408,7 +419,7 @@ namespace ACT_Plugin
                     output.Add(cb.Name);
                     // start web server on enable
                     if (cb.Name == "web_server" && !this.openWebBtn.Enabled) {
-                        this.initWebServer();
+                        this.initWebServer(HTTP_SERVER_PORT);
                     }
                 // stop web server on disable
                 } else if (cb.Name == "web_server" && this.openWebBtn.Enabled) {
@@ -427,15 +438,15 @@ namespace ACT_Plugin
         // WEB SERVER
         //
 
-        void initWebServer() {
-            this.openWebBtn.Enabled = false;
+        void initWebServer(int port) {
+            this.deinitWebServer();
             if (!this.getSetting("web_server")) {
                 return;
             }
             try {
                 this.webListener = new TcpListener(
                     IPAddress.Parse("0.0.0.0"),
-                    HTTP_SERVER_PORT
+                    port
                 );
                 this.webListener.Start();
                 this.webThread = new Thread(new ThreadStart(this.webListen));
@@ -444,11 +455,16 @@ namespace ACT_Plugin
             } catch {
                 this.lblStatus.Text = "Failed to start web server.";
             }
+
         }
 
         void deinitWebServer() {
-            this.webThread.Abort();
-            this.webListener.Stop();
+            if (this.webThread != null) {
+                this.webThread.Abort();
+            }
+            if (this.webListener != null) {
+                this.webListener.Stop();
+            }
             this.openWebBtn.Enabled = false;
         }
 
@@ -457,6 +473,10 @@ namespace ACT_Plugin
             var webPath = this.getPluginDirectory() + "\\web";
             while (true) {
                 try {
+                    if (!this.webListener.Pending()) {
+                        Thread.Sleep(100);
+                        continue;
+                    }
                     Socket s = this.webListener.AcceptSocket();  
                     if (!s.Connected) {
                         continue;
@@ -466,11 +486,13 @@ namespace ACT_Plugin
                     s.Receive(recvBytes, recvBytes.Length, 0);
                     var recv = Encoding.ASCII.GetString(recvBytes);
                     if (recv.Trim() == "") {
-                        break;
+                        s.Close();
+                        continue;
                     }
                     var recvSplit = recv.Split(' ');
                     if (recvSplit.Length < 1) {
-                        break;
+                        s.Close();
+                        continue;
                     }
                     var path = recvSplit[1];
                     // send response
