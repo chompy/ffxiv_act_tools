@@ -31,8 +31,10 @@ var ENCOUNTER_ELEMENTS = {
 }
 var PLAYER_ELEMENT = document.createElement("div");
 var currentEncounter = "";
-var encounterSeconds = 0;
+var currentEncTime = -1;
+var currentEncActive = false;
 var timeout = null;
+var timerTimeout = null;
 
 function init() {
     // setup encounter elment
@@ -48,8 +50,8 @@ function init() {
     ENCOUNTER_ELEMENT.appendChild(ENCOUNTER_ELEMENTS.state);
     // -- time
     ENCOUNTER_ELEMENTS.time.className = "time";
-    ENCOUNTER_ELEMENTS.time.innerText = "--:--";
     ENCOUNTER_ELEMENT.appendChild(ENCOUNTER_ELEMENTS.time);
+    updateTimer();
     // player list div
     var playerEle = document.createElement("div");
     playerEle.id = "players";
@@ -57,6 +59,7 @@ function init() {
     document.getElementById("app").appendChild(playerEle);
     // begin polling for data
     poll();
+    tickTimer();
 }
 
 function poll() {
@@ -64,11 +67,33 @@ function poll() {
         clearTimeout(timeout);
     }
     fetch();
-    timeout = setTimeout(poll, 5000);
+    timeout = setTimeout(poll, 2500);
 }
 
 function reset() {
     document.getElementById("players").innerHTML = "";
+    currentEncTime = -1;
+}
+
+function updateTimer() {
+    if (currentEncTime < 0) {
+        ENCOUNTER_ELEMENTS.time.innerText = "--:--";
+        return;
+    }
+    var seconds = currentEncTime % 60;
+    var minutes = Math.floor(currentEncTime / 60);
+    ENCOUNTER_ELEMENTS.time.innerText = (minutes < 10 ? "0": "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+}
+
+function tickTimer() {
+    if (timerTimeout) {
+        clearTimeout(timerTimeout);
+    }
+    if (currentEncTime >= 0 && currentEncActive) {
+        currentEncTime++;
+        updateTimer();
+    }
+    setTimeout(tickTimer, 1000);
 }
 
 function updateEncounter(data) {
@@ -80,9 +105,11 @@ function updateEncounter(data) {
     // set active state
     ENCOUNTER_ELEMENT.classList.remove("active");
     ENCOUNTER_ELEMENTS.state.innerText = "inactive";
+    currentEncActive = false;
     if (data.encounter[ENC_ACTIVE] == "1") {
         ENCOUNTER_ELEMENT.classList.add("active");
         ENCOUNTER_ELEMENTS.state.innerText = "active";
+        currentEncActive = true;
     }
     // update zone name
     ENCOUNTER_ELEMENTS.zone.innerText = data.encounter[ENC_ZONE];
@@ -90,10 +117,13 @@ function updateEncounter(data) {
     var startTime = new Date(Date.parse(data.encounter[ENC_START]))
     var endTime = new Date(Date.parse(data.encounter[ENC_END]));
     var diff = (endTime - startTime) / 1000;
-    var seconds = diff % 60;
-    var minutes = Math.floor(diff / 60);
-    ENCOUNTER_ELEMENTS.time.innerText = (minutes < 10 ? "0": "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
-    encounterSeconds = diff;
+    if (diff < 0) { 
+        diff = 0;
+    }
+    if (currentEncTime < diff) {
+        currentEncTime = diff;
+        updateTimer();
+    }
 }
 
 function updateCombatants(data) {
@@ -183,11 +213,11 @@ function updateCombatant(data, sort) {
     nameEle.title = nameEle.innerText;
     // update damage
     var damageEle = element.getElementsByClassName("damage")[0];
-    damageEle.innerText = sanitizeNumeric(data[COMB_DAMAGE] / encounterSeconds).toFixed(2);
+    damageEle.innerText = sanitizeNumeric(data[COMB_DAMAGE] / currentEncTime).toFixed(2);
     damageEle.title = damageEle.innerText + " damage per second (" + data[COMB_DAMAGE] + " total damage).";
     // update healing
     var healingEle = element.getElementsByClassName("healing")[0];
-    healingEle.innerText = sanitizeNumeric(data[COMB_HEALED] / encounterSeconds).toFixed(2);
+    healingEle.innerText = sanitizeNumeric(data[COMB_HEALED] / currentEncTime).toFixed(2);
     healingEle.title = healingEle.innerText + " healing per second (" + data[COMB_HEALED] + " total healing).";
     // update deaths
     var deathEle = element.getElementsByClassName("deaths")[0];
