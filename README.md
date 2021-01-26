@@ -28,10 +28,12 @@ When enabled this will start a web server on your local machine and your current
 I do want to make additional cool features. Some ideas include...
 - Better/easier to use UWU Titan gaols plugin.
 - Ability to write custom triggers in Lua.
+- End encounter on ready check.
 - End encounter on clear.
+- Push notification when you recieve a tell.
+- Push notification when your PF fills.
 
 Got any ideas of your own? Message me on Discord! **Chompy#3436**
 
 ## TODO
-- Make web page timer tick in real time and sync with ACT occasionally.
-- Figure out if it's possible to get updates in intervals of less than 10 seconds.
+- Figure out if it's possible to decrease update intervals for web server.
