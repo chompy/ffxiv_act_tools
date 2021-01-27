@@ -45,6 +45,7 @@ namespace ACT_Plugin
         const int LOG_MSG_COUNTDOWN_A = 0x0039;                 // Log message identifier for countdown message.
         const int LOG_MSG_COUNTDOWN_B = 0x00b9;
         const int LOG_MSG_COUNTDOWN_C = 0x0139;
+        const int POST_DEATH_TIMEOUT = 5;                       // Time (seconds) after all dead before ending encounter.
         const UInt16 HTTP_SERVER_PORT = 31594;                  // Port to host webserver on.
 
         TcpListener webListener;                                // Listener for web requests.
@@ -55,7 +56,8 @@ namespace ACT_Plugin
         private List<System.Windows.Forms.CheckBox> checkboxes; // List of settings checkboxes.
         private System.Windows.Forms.Button openWebBtn;         // Button that opens web page when clicked.
         private Dictionary<int, bool> deathTracker;             // Tracks deaths to determine when party wipe occurs.
-        private Dictionary<int, string[]> nameLookupTable;     // Mapping of actor id to act name and log name.
+        private long deathTime;
+        private Dictionary<int, string[]> nameLookupTable;      // Mapping of actor id to act name and log name.
         private string settingFilePath = Path.Combine(          // Path to settings file.
             ActGlobals.oFormActMain.AppDataFolder.FullName,
             "Config\\FFXIV_ACT_Tools.config.dat"
@@ -115,6 +117,7 @@ namespace ACT_Plugin
 			this.PerformLayout();
             // init death tracker
             this.deathTracker = new Dictionary<int, bool>();
+            this.deathTime = -1;
             this.nameLookupTable = new Dictionary<int, string[]>();
             // init regexs
             this.regexLogDefeat = new Regex(
@@ -276,6 +279,7 @@ namespace ACT_Plugin
             ActGlobals.oFormActMain.EndCombat(true);
             this.deathTracker.Clear();
             this.nameLookupTable.Clear();
+            this.deathTime = -1;
         }
 
         string getPluginDirectory() {
@@ -286,6 +290,13 @@ namespace ACT_Plugin
             }
             return "";
         }
+
+        long unixTimeNow()
+        {
+            var timeSpan = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0));
+            return (long)timeSpan.TotalSeconds;
+        }
+
 
         //
         // DEATH TRACKER
@@ -317,12 +328,20 @@ namespace ACT_Plugin
 
         bool isWipe() {
             if (this.deathTracker.Keys.Count == 0) {
+                this.deathTime = -1;
                 return false;
             }
             foreach (int id in this.deathTracker.Keys) {
                 if (!this.deathTracker[id]) {
+                    this.deathTime = -1;
                     return false;
                 }
+            }
+            if (this.deathTime < 0) {
+                this.deathTime = this.unixTimeNow();
+            }
+            if (this.unixTimeNow() - this.deathTime < POST_DEATH_TIMEOUT) {
+                return false;
             }
             return true;
         }
