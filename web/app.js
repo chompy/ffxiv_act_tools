@@ -120,7 +120,7 @@ function updateEncounter(data) {
     if (diff < 0) { 
         diff = 0;
     }
-    if (currentEncTime < diff) {
+    if (currentEncTime < diff || !currentEncActive) {
         currentEncTime = diff;
         updateTimer();
     }
