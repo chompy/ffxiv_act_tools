@@ -275,10 +275,13 @@ namespace ACT_Plugin
                     }
                     if (this.localPlayerName == "") {
                         var action = fields[4];
-                        var damage = int.Parse(
-                            fields[8].Substring(0, 4),
-                            System.Globalization.NumberStyles.HexNumber
-                        );
+                        var damage = 0;
+                        if (fields[8].Length >= 4) {
+                            damage = int.Parse(
+                                fields[8].Substring(0, 4),
+                                System.Globalization.NumberStyles.HexNumber
+                            );
+                        }
                         this.playerActions.Add(new string[]{name, action + " " + damage.ToString() });
                         this.checkLocalPlayer();
                     }
