@@ -31,7 +31,7 @@ using Advanced_Combat_Tracker;
 [assembly: AssemblyTitle("FFXIV ACT Tools")]
 [assembly: AssemblyDescription("Provides additional functionality to FFXIV ACT parsing.")]
 [assembly: AssemblyCompany("Chompy#3436")]
-[assembly: AssemblyVersion("0.02")]
+[assembly: AssemblyVersion("0.03")]
 
 namespace ACT_Plugin
 {
@@ -82,7 +82,7 @@ namespace ACT_Plugin
                 new string[]{"end_on_wipe", "End encounter on wipe"},
                 new string[]{"end_on_countdown", "End encounter on countdown"},
                 new string[]{"web_server", "Export parses to web server at http://localhost:" + HTTP_SERVER_PORT.ToString()},
-                new string[]{"uwu_jails", "Jail callouts for The Weapon's Refrain (Ultimate) (UWU)."},
+                new string[]{"uwu_jails", "Jail callouts for The Weapon's Refrain (Ultimate) (UWU)"},
             };
             // build checkboxes to allow user to select options
             this.checkboxes = new List<System.Windows.Forms.CheckBox>{};
