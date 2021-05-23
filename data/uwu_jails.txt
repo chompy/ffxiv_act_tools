@@ -1,0 +1,25 @@
+# Jail order defined here. You can use player names or job names.
+# If you're playing with a PS4/5 player you can type in the character name
+# at the top or bottom of this list (top=front jail, bottom=back jail).
+
+PLD
+WAR
+DRK
+GNB
+
+DRG
+NIN
+SAM
+MNK
+
+DNC
+BRD
+MCH
+
+BLM
+SMN
+RDM
+
+WHM
+SCH
+AST

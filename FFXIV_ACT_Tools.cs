@@ -30,8 +30,8 @@ using Advanced_Combat_Tracker;
 
 [assembly: AssemblyTitle("FFXIV ACT Tools")]
 [assembly: AssemblyDescription("Provides additional functionality to FFXIV ACT parsing.")]
-[assembly: AssemblyCompany("Minda Silva @ Sargantanas")]
-[assembly: AssemblyVersion("0.01")]
+[assembly: AssemblyCompany("Chompy#3436")]
+[assembly: AssemblyVersion("0.02")]
 
 namespace ACT_Plugin
 {
@@ -45,19 +45,31 @@ namespace ACT_Plugin
         const int LOG_MSG_COUNTDOWN_A = 0x0039;                 // Log message identifier for countdown message.
         const int LOG_MSG_COUNTDOWN_B = 0x00b9;
         const int LOG_MSG_COUNTDOWN_C = 0x0139;
+        const int LOG_MSG_YOU_USE = 0x082b;                     // Log message identifier for player casting ability.
+        const int LOG_MSG_ENEMY_TAKES = 0x0aa9;                 // Log message identifier for enemy taking damage from player.
         const int POST_DEATH_TIMEOUT = 5;                       // Time (seconds) after all dead before ending encounter.
         const UInt16 HTTP_SERVER_PORT = 31594;                  // Port to host webserver on.
+        const string JAIL_MESSAGES = "first,second,third";      // What to say when player is jailed in UWU.
 
         TcpListener webListener;                                // Listener for web requests.
         Thread webThread;                                       // Thread for web requests.
         Regex regexLogDefeat;                                   // Regex for defeated log message.
+        Regex regexPlayerCast;
+        Regex regexEnemyDamage;
+        Regex regexUwuJails;
         private Label lblStatus;                                // The status label that appears in ACT's Plugin tab.
         private string[][] optionList;                          // List of options to be configured.
         private List<System.Windows.Forms.CheckBox> checkboxes; // List of settings checkboxes.
         private System.Windows.Forms.Button openWebBtn;         // Button that opens web page when clicked.
+        private System.Windows.Forms.Button openJailBtn;        // Button that opens jail order file when clicked.
         private Dictionary<int, bool> deathTracker;             // Tracks deaths to determine when party wipe occurs.
         private long deathTime;
         private Dictionary<int, string[]> nameLookupTable;      // Mapping of actor id to act name and log name.
+        private string localPlayerName = "";                    // Name of local player.
+        private List<string> localPlayerActions;                // List of actions performed by local player (used to find local player name).
+        private List<string[]> playerActions;                   // List of actions performed by all players (used to find local player name),
+        private List<string> jailedPlayers;                     // List of players in Titan jails (UWU).
+
         private string settingFilePath = Path.Combine(          // Path to settings file.
             ActGlobals.oFormActMain.AppDataFolder.FullName,
             "Config\\FFXIV_ACT_Tools.config.dat"
@@ -70,6 +82,7 @@ namespace ACT_Plugin
                 new string[]{"end_on_wipe", "End encounter on wipe"},
                 new string[]{"end_on_countdown", "End encounter on countdown"},
                 new string[]{"web_server", "Export parses to web server at http://localhost:" + HTTP_SERVER_PORT.ToString()},
+                new string[]{"uwu_jails", "Jail callouts for The Weapon's Refrain (Ultimate) (UWU)."},
             };
             // build checkboxes to allow user to select options
             this.checkboxes = new List<System.Windows.Forms.CheckBox>{};
@@ -98,7 +111,7 @@ namespace ACT_Plugin
             titleLabel.AutoSize = true;
             titleLabel.Location = new System.Drawing.Point(8, 8);
             titleLabel.Name = "title";
-            titleLabel.Text = "Uptime ACT Plugin by Minda Silva@Sargatanas";
+            titleLabel.Text = "Poggers ACT Plugin. By Minda Silva@Sargatanas / Qunara Sivra@Excalibur / Chompy#3436.";
             this.Controls.Add(titleLabel);
             // open web server button
             this.openWebBtn = new System.Windows.Forms.Button();
@@ -108,6 +121,14 @@ namespace ACT_Plugin
             this.openWebBtn.Text = "Open Parse Web Page";
             this.openWebBtn.Enabled = true;
             this.Controls.Add(this.openWebBtn);
+            // open jail order file button
+            this.openJailBtn = new System.Windows.Forms.Button();
+            this.openJailBtn.AutoSize = true;
+            this.openJailBtn.Location = new System.Drawing.Point(150, 32+(y*32));
+            this.openJailBtn.Name = "openJail";
+            this.openJailBtn.Text = "Edit Jail Orders";
+            this.openJailBtn.Enabled = true;
+            this.Controls.Add(this.openJailBtn);
             // finish building form
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -119,10 +140,24 @@ namespace ACT_Plugin
             this.deathTracker = new Dictionary<int, bool>();
             this.deathTime = -1;
             this.nameLookupTable = new Dictionary<int, string[]>();
+            // init local player name discovery
+            this.localPlayerActions = new List<string>();
+            this.playerActions = new List<string[]>();
+            // jails
+            this.jailedPlayers = new List<string>();
             // init regexs
             this.regexLogDefeat = new Regex(
                 @" 19:([a-zA-Z0-9'\- ]*) was defeated by [A-Za-z'\- ]*",
                 RegexOptions.Compiled
+            );
+            this.regexPlayerCast = new Regex(
+                @"You (use|cast) (.*)."
+            );
+            this.regexEnemyDamage = new Regex(
+                @"(.*) takes ([0-9]*) damage."
+            );
+            this.regexUwuJails = new Regex(
+                @":2B6(B|C):.*:.*:(.*):"
             );
         }
 
@@ -137,10 +172,12 @@ namespace ACT_Plugin
             // hook events
             ActGlobals.oFormActMain.AfterCombatAction += new CombatActionDelegate(this.oFormActMain_AfterCombatAction);
             ActGlobals.oFormActMain.OnLogLineRead += new LogLineEventDelegate(this.oFormActMain_OnLogLineRead);
+            ActGlobals.oFormActMain.OnCombatEnd += new CombatToggleEventDelegate(this.oFormActMain_OnCombatEnd);
             foreach (System.Windows.Forms.CheckBox cb in this.checkboxes) {
                 cb.CheckedChanged += new EventHandler(this.checkbox_OnChange);
             }
             this.openWebBtn.Click += new EventHandler(this.buttonWebOpen_OnClick);
+            this.openJailBtn.Click += new EventHandler(this.buttonJailOpen_OnClick);
             // form stuff
 			pluginScreenSpace.Controls.Add(this);	// Add this UserControl to the tab ACT provides
 			this.Dock = DockStyle.Fill;	// Expand the UserControl to fill the tab's client space
@@ -150,6 +187,7 @@ namespace ACT_Plugin
                     p.tpPluginSpace.Text = "FFXIV ACT Tools";
                 }
             }
+            this.reset();
             // start web server
             this.initWebServer(HTTP_SERVER_PORT);
         }
@@ -159,10 +197,12 @@ namespace ACT_Plugin
             // deinit event hooks
             ActGlobals.oFormActMain.AfterCombatAction -= this.oFormActMain_AfterCombatAction;
             ActGlobals.oFormActMain.OnLogLineRead  -= this.oFormActMain_OnLogLineRead;
+            ActGlobals.oFormActMain.OnCombatEnd -= this.oFormActMain_OnCombatEnd;
             foreach (System.Windows.Forms.CheckBox cb in this.checkboxes) {
                 cb.CheckedChanged -= this.checkbox_OnChange;
             }
             this.openWebBtn.Click -= this.buttonWebOpen_OnClick;
+            this.openJailBtn.Click -= this.buttonJailOpen_OnClick;
             // stop web server
             this.deinitWebServer();
             // update plugin status text
@@ -199,7 +239,7 @@ namespace ACT_Plugin
                 // add entry to name lookup table
                 if (!this.nameLookupTable.ContainsKey(cId)) {
                     this.nameLookupTable[cId] = new string[]{
-                        actionInfo.attacker, ""
+                        actionInfo.attacker, "", job
                     };
                 }
             }
@@ -233,6 +273,15 @@ namespace ACT_Plugin
                     if (this.nameLookupTable.ContainsKey(id)) {
                         this.nameLookupTable[id][1] = name;
                     }
+                    if (this.localPlayerName == "") {
+                        var action = fields[4];
+                        var damage = int.Parse(
+                            fields[8].Substring(0, 4),
+                            System.Globalization.NumberStyles.HexNumber
+                        );
+                        this.playerActions.Add(new string[]{name, action + " " + damage.ToString() });
+                        this.checkLocalPlayer();
+                    }
                     break;
                 }
                 case LOG_TYPE_MESSAGE: {
@@ -250,14 +299,41 @@ namespace ACT_Plugin
                             }
                             break;
                         }
+                        case LOG_MSG_YOU_USE: {
+                            if (this.localPlayerName == "") {
+                                MatchCollection matches = this.regexPlayerCast.Matches(fields[2]);
+                                foreach (Match match in matches) {
+                                    GroupCollection groups = match.Groups;
+                                    this.localPlayerActions.Add(groups[2].Value);
+                                }
+                            }
+                            break;
+                        }
+                        case LOG_MSG_ENEMY_TAKES: {
+                            if (this.localPlayerName == "" && this.localPlayerActions.Count > 0) {
+                                MatchCollection matches = this.regexEnemyDamage.Matches(fields[2]);
+                                foreach (Match match in matches) {
+                                    GroupCollection groups = match.Groups;
+                                    this.localPlayerActions[this.localPlayerActions.Count-1] += " " + groups[2].Value;
+                                    this.checkLocalPlayer();
+                                }
+                            }
+                            break;
+                        }
                     }
                     break;
                 }
             }
+            this.checkJails(logInfo);
             if (this.isWipe() && this.getSetting("end_on_wipe")) {
                 //this.lblStatus.Text = "WIPE RESET";
                 this.reset();
             }
+        }
+
+        void oFormActMain_OnCombatEnd(bool isImport, CombatToggleEventArgs encounterInfo)
+        {
+            this.reset();
         }
 
         void checkbox_OnChange(object sender, System.EventArgs e)
@@ -270,19 +346,26 @@ namespace ACT_Plugin
             this.openWebPage();
         }
 
+        void buttonJailOpen_OnClick(object sender, System.EventArgs e) 
+        {
+            this.openJailOrderFile();
+        }
 
         //
         // GENERAL
         //
 
-        void reset() { 
+        void reset()
+        { 
             ActGlobals.oFormActMain.EndCombat(true);
             this.deathTracker.Clear();
             this.nameLookupTable.Clear();
+            this.jailedPlayers.Clear();
             this.deathTime = -1;
         }
 
-        string getPluginDirectory() {
+        string getPluginDirectory()
+        {
             foreach (ActPluginData p in ActGlobals.oFormActMain.ActPlugins) {
                 if (p.pluginObj == this) {
                     return p.pluginFile.DirectoryName;
@@ -297,19 +380,47 @@ namespace ACT_Plugin
             return (long)timeSpan.TotalSeconds;
         }
 
+        void checkLocalPlayer()
+        {
+            if (this.localPlayerName != "") {
+                return;
+            }
+            foreach (string[] playerAction in this.playerActions) {
+                foreach (string localAction in this.localPlayerActions) {
+                    if (localAction == playerAction[1]) {
+                        this.localPlayerName = playerAction[0];
+                        this.playerActions.Clear();
+                        this.localPlayerActions.Clear();
+                        return;
+                    }
+                }
+            }
+        }
+
+        string getCombatantJobFromName(string name)
+        {
+            foreach (int id in this.nameLookupTable.Keys) {
+                if (this.nameLookupTable[id][1] == name) {
+                    return this.nameLookupTable[id][2];
+                }
+            }
+            return "";
+        }
 
         //
         // DEATH TRACKER
         //
 
-        string getCombatantNameFromId(int id) {
+        string getCombatantNameFromId(int id)
+        {
             if (this.nameLookupTable.ContainsKey(id)) {
                 return this.nameLookupTable[id][1];
             }
             return "";
         }
 
-        int getCombatantIdFromName(string name) {
+        int getCombatantIdFromName(string name)
+        {
             foreach (int id in this.nameLookupTable.Keys) {
                 if (this.nameLookupTable[id][1] == name) {
                     return id;
@@ -318,7 +429,8 @@ namespace ACT_Plugin
             return 0;
         }
 
-        void setDeathByName(string name, bool active) {
+        void setDeathByName(string name, bool active)
+        {
             foreach (int id in this.nameLookupTable.Keys) {
                 if (name == this.nameLookupTable[id][1]) {
                     this.deathTracker[id] = true;
@@ -326,7 +438,8 @@ namespace ACT_Plugin
             }
         }
 
-        bool isWipe() {
+        bool isWipe()
+        {
             if (this.deathTracker.Keys.Count == 0) {
                 this.deathTime = -1;
                 return false;
@@ -350,7 +463,8 @@ namespace ACT_Plugin
         // DATA EXPORT
         //
 
-        string exportCombatData() {
+        string exportCombatData()
+        {
             var res = "";
             if (ActGlobals.oFormActMain.ActiveZone == null || ActGlobals.oFormActMain.ActiveZone.ActiveEncounter == null) {
                 return "";
@@ -396,7 +510,8 @@ namespace ACT_Plugin
         // SETTINGS
         //
 
-        bool getSetting(string name) {
+        bool getSetting(string name)
+        {
             foreach (System.Windows.Forms.CheckBox cb in this.checkboxes) {
                 if (name == cb.Name && cb.Checked) {
                     return true;
@@ -457,7 +572,8 @@ namespace ACT_Plugin
         // WEB SERVER
         //
 
-        void initWebServer(int port) {
+        void initWebServer(int port)
+        {
             this.deinitWebServer();
             if (!this.getSetting("web_server")) {
                 return;
@@ -477,7 +593,8 @@ namespace ACT_Plugin
 
         }
 
-        void deinitWebServer() {
+        void deinitWebServer()
+        {
             if (this.webThread != null) {
                 this.webThread.Abort();
             }
@@ -487,8 +604,8 @@ namespace ACT_Plugin
             this.openWebBtn.Enabled = false;
         }
 
-        void webListen() {
-
+        void webListen()
+        {
             var webPath = this.getPluginDirectory() + "\\web";
             while (true) {
                 try {
@@ -587,9 +704,108 @@ namespace ACT_Plugin
             }
         }
 
-        void openWebPage() {
+        void openWebPage()
+        {
             System.Diagnostics.Process.Start("http://localhost:" + HTTP_SERVER_PORT.ToString());
         }
+        
+        //
+        // UWU TITAN JAILS
+        //
+
+        void checkJails(LogLineEventArgs logInfo)
+        {
+            if (!this.getSetting("uwu_jails")) {
+                return;
+            }
+            MatchCollection matches = this.regexUwuJails.Matches(logInfo.logLine);
+            foreach (Match match in matches) {
+                GroupCollection groups = match.Groups;
+                this.jailedPlayers.Add(groups[2].Value);
+            }
+            if (this.jailedPlayers.Count == 3) {
+                var orderData = this.readJailOrderFile();
+                var jailedPlayerOrder = new List<int[]>();
+                foreach (var player in this.jailedPlayers) {
+                    var playerId = this.getCombatantIdFromName(player);
+                    var hasOrder = false;
+                    // player name will take highest priority in sorting
+                    for (var i = 0; i < orderData.Count; i++) {
+                        if (orderData[i].ToLower() == player.ToLower()) {
+                            jailedPlayerOrder.Add(new int[]{i, playerId});
+                            hasOrder = true;
+                            break;
+                        }
+                    }
+                    // use job to sort if player name not found
+                    if (!hasOrder) {
+                        var job = this.getCombatantJobFromName(player);
+                        for (var i = 0; i < orderData.Count; i++) {
+                            if (orderData[i].ToLower() == job.ToLower()) {
+                                jailedPlayerOrder.Add(new int[]{i, playerId});
+                                hasOrder = true;
+                                break;
+                            }
+                        }
+                    }
+                    // if no order can be determined used player id as sorting
+                    if (!hasOrder) {
+                        jailedPlayerOrder.Add(new int[]{playerId, playerId});
+                    }
+                }
+                // this prevents it from looping
+                this.jailedPlayers.Add("");
+                // sort list by player order
+                jailedPlayerOrder.Sort(delegate(int[] a, int[] b) {
+                    if (a[0] == b[0]) { return 0; }
+                    return a[0] > b[0] ? 1 : -1;
+                });
+                // itterate and find local player's jail
+                for (var i = 0; i < jailedPlayerOrder.Count; i++) {
+                    var player = this.getCombatantNameFromId(jailedPlayerOrder[i][1]);
+                    if (player == this.localPlayerName) {
+                        var messages = JAIL_MESSAGES.Split(',');
+                        ActGlobals.oFormActMain.TTS(messages[i]);
+                        break;
+                    }
+                }
+            }
+        }
+
+        string getJailOrderFilePath()
+        {
+            return this.getPluginDirectory() + "\\data\\uwu_jails.txt";
+        }
+
+        void openJailOrderFile()
+        {
+            System.Diagnostics.Process.Start(this.getJailOrderFilePath());
+        }
+
+        List<string> readJailOrderFile()
+        {
+            var jailOrderPath = this.getJailOrderFilePath();
+            string orderData = "";
+            using (FileStream fs = new FileStream(jailOrderPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    fs.CopyTo(ms);
+                    orderData = Encoding.ASCII.GetString(ms.ToArray());
+                }
+            }
+            var outData = new List<string>();
+            var lines = orderData.Split(new []{'\r', '\r'}); 
+            foreach (var lineRaw in lines) {
+                var line = lineRaw.Trim();
+                if (line == "" || line[0] == '#') {
+                    continue;
+                }
+                outData.Add(line);
+            }
+            return outData;
+        }
+
 
     }
 }
