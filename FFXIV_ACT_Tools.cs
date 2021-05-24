@@ -31,7 +31,7 @@ using Advanced_Combat_Tracker;
 [assembly: AssemblyTitle("FFXIV ACT Tools")]
 [assembly: AssemblyDescription("Provides additional functionality to FFXIV ACT parsing.")]
 [assembly: AssemblyCompany("Chompy#3436")]
-[assembly: AssemblyVersion("0.03")]
+[assembly: AssemblyVersion("0.04")]
 
 namespace ACT_Plugin
 {
@@ -157,7 +157,7 @@ namespace ACT_Plugin
                 @"(.*) takes ([0-9]*) damage."
             );
             this.regexUwuJails = new Regex(
-                @":2B6(B|C):.*:.*:(.*):"
+                @":2B6(B|C):.*?:.*?:(.*?):0:"
             );
         }
 
@@ -794,7 +794,6 @@ namespace ACT_Plugin
 
                 for (var i = 0; i < jailedPlayerOrder.Count; i++) {
                     var player = this.getCombatantNameFromId(jailedPlayerOrder[i][1]);
-                    this.lblStatus.Text += player + ", ";
                     if (player == this.localPlayerName) {
                         var messages = JAIL_MESSAGES.Split(',');
                         ActGlobals.oFormActMain.TTS(messages[i]);
