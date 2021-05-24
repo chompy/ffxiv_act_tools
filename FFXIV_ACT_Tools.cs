@@ -241,12 +241,14 @@ namespace ACT_Plugin
                     this.nameLookupTable[cId] = new string[]{
                         actionInfo.attacker, "", job
                     };
+                    this.writeLog("Add name lookup (ACT) " + actionInfo.attacker + " (" + job + ").");
                 }
             }
         }
 
         void oFormActMain_OnLogLineRead(bool isImport, LogLineEventArgs logInfo)
         {
+            this.checkJails(logInfo);
             if (logInfo.logLine.Length <= 17) {
                 return;
             }
@@ -270,8 +272,9 @@ namespace ACT_Plugin
                         System.Globalization.NumberStyles.HexNumber
                     );
                     var name = fields[2];
-                    if (this.nameLookupTable.ContainsKey(id)) {
+                    if (this.nameLookupTable.ContainsKey(id) && this.nameLookupTable[id][1] == "") {
                         this.nameLookupTable[id][1] = name;
+                        this.writeLog("Add name lookup (LOG) " + name + ".");
                     }
                     if (this.localPlayerName == "") {
                         var action = fields[4];
@@ -327,7 +330,6 @@ namespace ACT_Plugin
                     break;
                 }
             }
-            this.checkJails(logInfo);
             if (this.isWipe() && this.getSetting("end_on_wipe")) {
                 //this.lblStatus.Text = "WIPE RESET";
                 this.reset();
@@ -365,6 +367,9 @@ namespace ACT_Plugin
             this.nameLookupTable.Clear();
             this.jailedPlayers.Clear();
             this.deathTime = -1;
+            //this.nameLookupTable[998] = new string[]{"The Waifu", "The Waifu", "WHM"};
+            //this.nameLookupTable[999] = new string[]{"Celestia Ravenhart", "Celestia Ravenhart", "DNC"};
+            this.writeLog("=== RESET ===");
         }
 
         string getPluginDirectory()
@@ -394,6 +399,7 @@ namespace ACT_Plugin
                         this.localPlayerName = playerAction[0];
                         this.playerActions.Clear();
                         this.localPlayerActions.Clear();
+                        this.writeLog("Local player set to " + this.localPlayerName + ".");
                         return;
                     }
                 }
@@ -571,6 +577,16 @@ namespace ACT_Plugin
             this.lblStatus.Text = "Settings saved.";
         }
 
+        void writeLog(string line)
+        {
+            /*var logFilePath = this.getPluginDirectory() + "\\data\\log.txt";
+            using (FileStream fs = new FileStream(logFilePath, FileMode.Append, FileAccess.Write, FileShare.Write))
+            {
+                var outputBytes = Encoding.ASCII.GetBytes(line + "\r\n");
+                fs.Write(outputBytes, 0, outputBytes.Length);
+            }*/
+        }
+
         //
         // WEB SERVER
         //
@@ -725,6 +741,9 @@ namespace ACT_Plugin
             foreach (Match match in matches) {
                 GroupCollection groups = match.Groups;
                 this.jailedPlayers.Add(groups[2].Value);
+                var cid = this.getCombatantIdFromName(groups[2].Value);
+                var job = this.getCombatantJobFromName(groups[2].Value);
+                this.writeLog(groups[2].Value + " (" + cid.ToString() + ") (" + job + ") was jailed.");
             }
             if (this.jailedPlayers.Count == 3) {
                 var orderData = this.readJailOrderFile();
@@ -764,11 +783,22 @@ namespace ACT_Plugin
                     return a[0] > b[0] ? 1 : -1;
                 });
                 // itterate and find local player's jail
+                var jailedPlayerString = "";
+                foreach (var jailedPlayer in jailedPlayerOrder) {
+                    var player = this.getCombatantNameFromId(jailedPlayer[1]);
+                    jailedPlayerString += (jailedPlayerString == "" ? "" : ", ") + player;
+                }
+                if (jailedPlayerString != "") {
+                    this.writeLog("Jailed player order is " + jailedPlayerString + ".");
+                }
+
                 for (var i = 0; i < jailedPlayerOrder.Count; i++) {
                     var player = this.getCombatantNameFromId(jailedPlayerOrder[i][1]);
+                    this.lblStatus.Text += player + ", ";
                     if (player == this.localPlayerName) {
                         var messages = JAIL_MESSAGES.Split(',');
                         ActGlobals.oFormActMain.TTS(messages[i]);
+                        this.writeLog("Local player jail is " + messages[i] + ".");
                         break;
                     }
                 }
