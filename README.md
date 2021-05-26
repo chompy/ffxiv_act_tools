@@ -24,9 +24,11 @@ When enabled this will end the encounter when countdown timer is started.
 ### Export Parses to Web Server
 When enabled this will start a web server on your local machine and your current parse/encounter data will be available on it. This is useful for displaying your parses in OBS or just having a nice looking parse readout on your second monitor.
 
+### The Weapon's Refrain (Ultimate) Jails/Gaols Callouts
+When enabled this will call out your jail number in The Weapon's Refrain (Ultimate). An included text file dedictates the ordering, by default it uses role based ordering where tanks and melee are highest and healers are lowest. You can also manually add player names to the file.
+
 ### More to come!
 I do want to make additional cool features. Some ideas include...
-- Better/easier to use UWU Titan gaols plugin.
 - Ability to write custom triggers in Lua.
 - End encounter on ready check.
 - End encounter on clear.
