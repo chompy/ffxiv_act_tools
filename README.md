@@ -27,6 +27,8 @@ When enabled this will start a web server on your local machine and your current
 ### The Weapon's Refrain (Ultimate) Jails/Gaols Callouts
 When enabled this will call out your jail number in The Weapon's Refrain (Ultimate). An included text file dedictates the ordering, by default it uses role based ordering where tanks and melee are highest and healers are lowest. You can also manually add player names to the file.
 
+Additionally if you'd prefer to use the Jail Plugin by Tarutella you can export the current party list to an XML file that is compatible with that plugin. **IMPORTANT: To generate the party list you must first have everyone hit the boss and wipe.**
+
 ### More to come!
 I do want to make additional cool features. Some ideas include...
 - Ability to write custom triggers in Lua.

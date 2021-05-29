@@ -62,6 +62,7 @@ namespace ACT_Plugin
         private List<System.Windows.Forms.CheckBox> checkboxes; // List of settings checkboxes.
         private System.Windows.Forms.Button openWebBtn;         // Button that opens web page when clicked.
         private System.Windows.Forms.Button openJailBtn;        // Button that opens jail order file when clicked.
+        private System.Windows.Forms.Button exportJailOrdBtn;   // Button that exports current party order to jails plugin XML.
         private Dictionary<int, bool> deathTracker;             // Tracks deaths to determine when party wipe occurs.
         private long deathTime;
         private Dictionary<int, string[]> nameLookupTable;      // Mapping of actor id to act name and log name.
@@ -129,6 +130,14 @@ namespace ACT_Plugin
             this.openJailBtn.Text = "Edit Jail Orders";
             this.openJailBtn.Enabled = true;
             this.Controls.Add(this.openJailBtn);
+            // export jail xml button
+            this.exportJailOrdBtn = new System.Windows.Forms.Button();
+            this.exportJailOrdBtn.AutoSize = true;
+            this.exportJailOrdBtn.Location = new System.Drawing.Point(256, 32+(y*32));
+            this.exportJailOrdBtn.Name = "openJail";
+            this.exportJailOrdBtn.Text = "Export Jails XML";
+            this.exportJailOrdBtn.Enabled = true;
+            this.Controls.Add(this.exportJailOrdBtn);
             // finish building form
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -178,6 +187,7 @@ namespace ACT_Plugin
             }
             this.openWebBtn.Click += new EventHandler(this.buttonWebOpen_OnClick);
             this.openJailBtn.Click += new EventHandler(this.buttonJailOpen_OnClick);
+            this.exportJailOrdBtn.Click += new EventHandler(this.buttonJailExport_OnClick);
             // form stuff
 			pluginScreenSpace.Controls.Add(this);	// Add this UserControl to the tab ACT provides
 			this.Dock = DockStyle.Fill;	// Expand the UserControl to fill the tab's client space
@@ -203,6 +213,7 @@ namespace ACT_Plugin
             }
             this.openWebBtn.Click -= this.buttonWebOpen_OnClick;
             this.openJailBtn.Click -= this.buttonJailOpen_OnClick;
+            this.exportJailOrdBtn.Click -= this.buttonJailExport_OnClick;
             // stop web server
             this.deinitWebServer();
             // update plugin status text
@@ -354,6 +365,11 @@ namespace ACT_Plugin
         void buttonJailOpen_OnClick(object sender, System.EventArgs e) 
         {
             this.openJailOrderFile();
+        }
+
+        void buttonJailExport_OnClick(object sender, System.EventArgs e)
+        {
+            this.saveJailOrderXML();
         }
 
         //
@@ -836,6 +852,68 @@ namespace ACT_Plugin
                 outData.Add(line);
             }
             return outData;
+        }
+
+        void saveJailOrderXML() {
+
+            var orderData = readJailOrderFile();
+
+            var xmlOut = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?><Priority>";
+
+            var jailedPlayerOrder = new List<int[]>();
+
+            foreach (var playerId in this.nameLookupTable.Keys) {
+                var hasOrder = false;
+                var player = this.getCombatantNameFromId(playerId);
+                // player name will take highest priority in sorting
+                for (var i = 0; i < orderData.Count; i++) {
+                    if (orderData[i].ToLower() == player.ToLower()) {
+                        jailedPlayerOrder.Add(new int[]{i, playerId});
+                        hasOrder = true;
+                        break;
+                    }
+                }
+                // use job to sort if player name not found
+                if (!hasOrder) {
+                    var job = this.getCombatantJobFromName(player);
+                    for (var i = 0; i < orderData.Count; i++) {
+                        if (orderData[i].ToLower() == job.ToLower()) {
+                            jailedPlayerOrder.Add(new int[]{i, playerId});
+                            hasOrder = true;
+                            break;
+                        }
+                    }
+                }
+                // if no order can be determined used player id as sorting
+                if (!hasOrder) {
+                    jailedPlayerOrder.Add(new int[]{playerId, playerId});
+                }
+            }
+            // sort list by player order
+            jailedPlayerOrder.Sort(delegate(int[] a, int[] b) {
+                if (a[0] == b[0]) { return 0; }
+                return a[0] > b[0] ? 1 : -1;
+            });
+            foreach (var player in jailedPlayerOrder) {
+                xmlOut += "<Player>" + this.getCombatantNameFromId(player[1]) + "</Player>";
+            }
+            xmlOut += "</Priority>";
+
+            // save
+            Stream xmlStream ;
+            SaveFileDialog xmlDialog = new SaveFileDialog();
+            xmlDialog.Filter = "xml file (*.xml)|*.xml";
+            xmlDialog.RestoreDirectory = true;
+            xmlDialog.FileName = "Priority.xml";
+            if (xmlDialog.ShowDialog() == DialogResult.OK) {
+                if ((xmlStream = xmlDialog.OpenFile()) != null) {
+                    var outputBytes = Encoding.ASCII.GetBytes(xmlOut);
+                    xmlStream.Write(outputBytes, 0, outputBytes.Length);                 
+                    xmlStream.Close();
+                }
+            }
+
+
         }
 
 
