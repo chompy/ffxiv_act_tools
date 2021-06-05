@@ -31,14 +31,14 @@ using Advanced_Combat_Tracker;
 [assembly: AssemblyTitle("FFXIV ACT Tools")]
 [assembly: AssemblyDescription("Provides additional functionality to FFXIV ACT parsing.")]
 [assembly: AssemblyCompany("Chompy#3436")]
-[assembly: AssemblyVersion("0.04")]
+[assembly: AssemblyVersion("0.06")]
 
 namespace ACT_Plugin
 {
     public class FFXIV_ACT_Tools : UserControl, IActPluginV1
     {
 
-        const Int32 VERSION_NUMBER = 1;                         // Version number, much match version number in parse server
+        const Int32 VERSION_NUMBER = 6;                         // Version number, much match version number in parse server
         const int LOG_TYPE_MESSAGE = 0x00;                      // Log identifier for chat message.
         const int LOG_TYPE_SINGLE = 0x15;                       // Log identifier for single target attack.
         const int LOG_TYPE_DEFEAT = 0x19;                       // Log identifier for defeated message.
@@ -243,10 +243,8 @@ namespace ACT_Plugin
                     (string) actionInfo.tags["ActorID"],
                     System.Globalization.NumberStyles.HexNumber
                 );
-                // add entry to death tracker
-                if (!this.deathTracker.ContainsKey(cId)) {
-                    this.deathTracker[cId] = false;
-                }
+                // add and/or reset entry in death tracker
+                this.deathTracker[cId] = false;
                 // add entry to name lookup table
                 if (!this.nameLookupTable.ContainsKey(cId)) {
                     this.nameLookupTable[cId] = new string[]{
